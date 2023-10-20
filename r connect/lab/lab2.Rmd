@@ -1,0 +1,121 @@
+---
+title: "lab 2"
+output: html_document
+date: "2023-10-13"
+---
+
+```{r warning =FALSE, message = FALSE,echo=FALSE}
+library(RPostgreSQL)
+con <- dbConnect(RPostgres::Postgres(),
+                 host = "localhost", 
+                 port = 5433, 
+                 dbname = 'postgres',  
+                 user = 'postgres', 
+                 password = '123456') 
+```
+
+# insert
+
+## 1.把学生信息添加到student表中
+
+| **学号** | **姓名** | **性别** | **年龄** | **系科** |
+|----------|----------|----------|----------|----------|
+| 4001     | 赵茵     | 男       | 20       | SX       |
+| 4002     | 杨华     | 女       | 21       |          |
+
+```{sql, connection = con}
+insert into Student
+  Values(4001,'赵茵','男',20,'SX');
+```
+
+```{sql, connection = con}
+insert into student(sno, sname, ssex, sage)
+  Values(4002,'杨华','女',21);
+```
+
+## 2.批量插入数据
+
+1） 建立一个新表 sc_name ，有属性 sno , sname , ssex , cno , grade
+
+```{sql, connection = con}
+create table sc_name(
+  Sno char(6),
+  Sname varchar(8),
+  Ssex char(2),
+  Cno char(4),
+  Grade decimal(12,2)
+);
+```
+
+2） 把 SX 系学生的 sno,sname,ssex,cno,grade 插入到表 sc_name 中。
+
+```{sql, connection = con}
+insert into sc_name
+select A.sno, sname, ssex, cno, grade
+from student A join sc B
+on A.sno = B.sno
+where A.sdept = 'SX';
+```
+
+3） 察看 sc_name 表的数据
+
+```{sql, connection = con}
+select * from sc_name;
+```
+
+# Update
+
+1.修改 4001 学生的系科为: JSJ
+
+```{sql, connection = con}
+update student
+set sdept = 'JSJ'
+where sno = '4001';
+```
+
+2.把赵达的年龄加 1 岁，性别改为女。
+
+```{sql, connection = con}
+update student
+set sage = sage + 1, ssex = '女'
+where sname = '赵达';
+```
+
+3.修改赵达的 1081 课程的成绩为 93 分
+
+```{sql, connection = con}
+update sc 
+set grade = '93'
+where cno = '1081' and sno in
+(select sno from student A
+where A.sname = '赵达');
+```
+
+4.把电子商务课的成绩减去 1 分
+
+```{sql, connection = con}
+update sc
+set grade = grade - 1
+where cno in( 
+select cno from course A
+where A.cname = '电子商务');
+```
+
+# delete
+
+1.删除所有 JSJ 系的女生
+
+```{sql, connection = con}
+delete from student
+where sdept = 'JSJ' and ssex = '女';
+```
+
+2.删除"数据库原理"的课的选课纪录
+
+```{sql, connection = con}
+delete from sc
+where cno in(
+select cno from course A
+where A.cname = '数据库原理'
+);
+```

@@ -1,0 +1,379 @@
+---
+title: "lab 3"
+author: "Spencer Wang"
+date: "2023-10-13"
+output: html_document
+---
+
+```{r warning =FALSE, message = FALSE,echo=FALSE}
+library(RPostgreSQL)
+con <- dbConnect(RPostgres::Postgres(),
+                 host = "localhost", 
+                 port = 5433, 
+                 dbname = 'postgres',  
+                 user = 'postgres', 
+                 password = '123456') 
+```
+
+# 单表查询
+
+1.查询年龄在 19 至 21 岁之间的女生的学号,姓名,年龄,按年龄从大到小排列。
+
+```{sql, connection = con}
+select sno, sname, sage
+from student
+where sage >= 19 and sage <= 21 and ssex = '女'
+order by sage desc;
+```
+
+2.查询姓名中第 2 个字为"明"字的学生学号、性别。
+
+```{sql, connection = con}
+select sno, ssex
+from student
+where sname like '_明%';
+```
+
+3.查询 1081 课程没有成绩的学生学号、课程号
+
+```{sql, connection = con}
+select sno ,cno
+from sc
+where grade = null;
+```
+
+4.查询 JSJ 、SX 系的年龄大于 20 岁的学生学号,姓名，结果按系及学号排列
+
+```{sql, connection = con}
+select sno, sname from student
+where sdept = 'JSJ' or sdept = 'SX'
+and sage > 20
+order by sdept, sno ASC;
+```
+
+5.按 10 分制查询学生的 sno,cno,10 分制成绩 （1-10 分 为 1 ，11-20 分为 2 ，30-39 分为 3，...... 90-100 为 10）
+
+```{sql, connection = con}
+select sno, cno, (grade - grade % 10)/10 as ten_scale_grade from sc;
+```
+
+6.查询 student 表中的学生共分布在那几个系中。（distinct）
+
+```{sql, connection = con}
+select distinct sdept from student;
+```
+
+7.查询 3001 号学生 1081，1082 课程的成绩。
+
+```{sql, connection = con}
+select A.grade AS grade_1081, B.grade AS grade_1082
+from sc A, sc B
+where A.cno = '1081' and B.cno = '1082'
+and A.sno = B.sno and A.sno = '3001';
+```
+
+# 统计
+
+1.  查询姓名中有"明"字的学生人数。
+
+```{sql, connection = con}
+select distinct count(sname)
+from student
+where sname like '%明%';
+```
+
+2.计算'JSJ'系的平均年龄及最大年龄。
+
+```{sql, connection = con}
+select avg(sage) as average, max(sage) from student;
+```
+
+3.查询学生中姓名为张明、赵茵的人数
+
+```{sql, connection = con}
+SELECT sname, COUNT(*) AS count
+FROM student
+WHERE sname = '张明' or sname = '赵茵'
+GROUP BY sname;
+```
+
+4.计算每一门课的总分、平均分，最高分、最低分，按平均分由高到低排列
+
+```{sql, connection = con}
+select cno, sum(grade), avg(grade), max(grade), min(grade)
+from sc
+group by cno
+order by avg(grade) desc;
+```
+
+```{sql, connection = con}
+select cname, sum(grade), avg(grade), max(grade), min(grade)
+from sc left outer join course
+on sc.cno = course.cno
+group by cname
+order by avg(grade) desc;
+```
+
+5.计算 1081,1082 课程的平均分。
+
+```{sql, connection = con}
+select avg(A.grade) as AVG_1, Avg(B.grade) as AVG_2
+from sc A, sc B
+where A.cno = '1081'
+and B.cno = '1082';
+```
+
+6.查询平均分大于 80 分的学生学号及平均分
+
+```{sql, connection = con}
+select sno, avg(grade)
+from sc
+group by sno
+having avg(grade) > 80;
+```
+
+7.统计选修课程超过 1 门的学生学号
+
+```{sql, connection = con}
+select sno
+from sc
+group by sno
+having count(sno) > 1;
+```
+
+8.统计有 2 位成绩大于 85 分以上的课程号。
+
+```{sql, connection = con}
+select cno from sc
+group by cno
+having count(grade > 85) = 2;
+```
+
+9.统计平均分及格的学生学号
+
+```{sql, connection = con}
+select sno from sc
+group by sno
+having avg(grade) > 60;
+```
+
+10.统计有大于等于两门课及格的学生学号
+
+```{sql, connection = con}
+select sno from sc
+group by sno
+having count(grade > 60) >= 2;
+```
+
+# 连接
+
+1.查询 JSJ 系的学生选修的课程号
+
+```{sql, connection = consql, connection = con}
+select distinct cno from sc
+where sno in(
+select sno from student
+where sdept = 'JSJ');
+```
+
+2.查询选修 1081 课程的学生的学生姓名 (不用嵌套及嵌套 2 种方法）
+
+```{sql, connection = con}
+select distinct A.sname
+from student A left outer join sc B
+on A.sno = B.sno
+where B.cno = '1081';
+```
+
+```{sql, connection = con}
+select distinct sname from student
+where sno in(
+select sno from sc
+where cno = '1081');
+```
+
+3.查询数据库原理及格的学生学号及成绩
+
+```{sql, connection = con}
+select sno, grade from sc
+where cno in(
+select cno from course
+where cname = '数据库原理')
+and grade > 60;
+```
+
+4.查询选修"数据库原理"课且成绩 70 以上的学生姓名(不用嵌套及嵌套 2 种方法）
+
+```{sql, connection = con}
+select A.sname from
+student A left outer join sc B
+on A.sno = B.sno
+where B.cno = '1082'
+and B.grade > 70;
+```
+
+```{sql, connection = con}
+select sname from student 
+where sno in (
+select sno from sc
+where grade > 70
+and cno in(
+select cno from course
+where cname = '数据库原理'
+));
+```
+
+5.查询平均分及格的学生的学号，姓名,平均分。
+
+```{sql, connection = con}
+select A.sno, A.sname, avg(B.grade)
+from student A left outer join sc B
+on A.sno = B.sno
+where B.grade > 60
+group by A.sno;
+```
+
+6.查询女学生平均分高于 75 分的学生姓名。
+
+```{sql ,connection = con}
+select A.sname
+from student A left outer join (select sno, avg(grade) from sc group by sno) B
+on A.sno = B.sno
+where A.ssex = '女'
+and B.avg > 75;
+```
+
+7.查询女学生学号、姓名、课程号、成绩。(一门课程也没有选修的男学生也要列出，不能遗漏)
+
+```{sql ,connection = con}
+select A.sno, A.sname, B.cno, B.grade 
+from student A left outer join sc B
+on A.sno = B.sno
+where A.ssex = '女';
+```
+
+# 嵌套相关和其他
+
+1.查询平均分及格的学生人数
+
+```{sql, connection = con}
+select count(distinct sno) from sc
+having avg(grade) > 60;
+```
+
+2.查询没有选修 1082 课程的学生的学生姓名
+
+```{sql, connection = con}
+(select distinct sno from student)
+except all
+(select distinct sno from sc
+where cno = '1082');
+```
+
+3.查询平均分最高的学生学号及平均分 （2 种方法 TOP , any , all）
+
+```{sql, connection = con}
+select sno, avg(grade) from sc
+group by sno
+having avg(grade) >= all(
+select avg(grade) from sc
+)
+```
+
+```{sql, connection = con}
+select sno, avg(grade) from sc
+group by sno
+having avg(grade) >= all(
+select avg(grade) from sc
+)
+```
+
+4.查询没有选修 1001，1002 课程的学生姓名。
+
+```{sql, connection = con}
+select distinct sname from student
+where sno in
+(select sno from sc
+where cno <> '1001' and cno <> '1002');
+```
+
+5.查询 1081 课程第一名的学生学号（2 种方法）
+
+```{sql, connection = con}
+select sno from sc
+where grade >= all(
+select grade from sc
+);
+```
+
+```{sql, connection = con}
+select sno from sc
+where cno = '1081'
+and grade in
+(select max(grade) from sc
+where cno = '1081');
+```
+
+6.查询平均分前两名的学生学号
+
+```{sql, connection = con}
+select sno, avg(grade) from sc
+group by sno
+order by avg(grade) desc limit 2;
+```
+
+7.查询 JSJ 系的学生与年龄不大于 19 岁的学生的差集
+
+```{sql, connection = con}
+(select sname from student
+where sdept = 'JSJ')
+except all
+(select sname from student
+where sage <= 19);
+```
+
+8.查询平均分大于 85 分的学生学号、姓名
+
+```{sql, connection = con}
+select sno, sname, avg(grade)
+from 
+(select A.sno, B.sname, A.grade
+from sc A left outer join student B
+on A.sno = B.sno)
+group by sno, sname
+having avg(grade) > 85;
+```
+
+9.查询每门课程成绩都高于该门课程平均分的学生学号 ??????????
+
+```{sql, connection = con}
+SELECT sno
+FROM sc
+WHERE cno IN (
+    SELECT cno
+    FROM sc
+    GROUP BY cno
+    HAVING AVG(grade) < (
+        SELECT AVG(grade)
+        FROM sc
+        WHERE sc.cno = cno
+    )
+)
+GROUP BY sno;
+```
+
+10.查询大于本系科平均年龄的学生姓名
+
+```{sql, connection = con}
+select distinct sname, sdept from student A
+where A.sage > all(select B.avg from
+(select sdept, avg(sage) from student
+group by sdept) B
+where A.sdept = B.sdept); 
+```
+
+```{sql, connection = con}
+select avg from
+(select avg(grade), cno from sc group by cno) 
+where cno = '1081';
+```

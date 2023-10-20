@@ -1,0 +1,784 @@
+---
+title: "数据库"
+author: "Spencer Wang"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+## 数据库接口
+
+```{r warning =FALSE, message = FALSE,echo=FALSE}
+library(RPostgreSQL)
+con <- dbConnect(RPostgres::Postgres(),
+                 host = "localhost", 
+                 port = 5433, 
+                 dbname = 'postgres',  
+                 user = 'postgres', 
+                 password = '123456') 
+```
+
+## 一些基本的信息
+-   数据库三级结构：外部级，概念级，内部级
+
+-   查询语句的处理流程
+
+    -   解析器
+
+    -   分析器
+
+    -   重写器
+
+    -   优化器
+
+    -   执行器
+
+-   关系模型 Schema
+
+    -   使用$R(A_1, A_2,A_3...A_n)$表示
+
+    -   R是关系的名称
+
+    -   $A_1, A_2…$是属性 -> 表格里的纵向数据
+
+    -   $r(R)$是关系R的状态
+
+        -   $r(R) = t_1,t_2…t_n$，其中t表示元组 -> 元组是表格中的横向数据
+
+        -   $t_i = v_1,v_2…,v_n$，其中，每个$v_i$ 属于$dom(A_i)$ 
+
+        -   $r(R) \in dom(A_1) * dom(A_2)… * dom(A_n)$
+
+    -   数据库 = 关系的集合
+
+    -   关系模式 = 关系名 + 属性集
+
+    -   数据库模式 = 数据库中所有关系模式的集合
+
+    -   元组是有序数据的集合，使用<>包围
+
+    | table | database |
+    |-------|----------|
+    | 表格  | 关系     |
+    | 行    | 元组     |
+    | 列    | 属性     |
+
+    -   关系模型的特点
+
+        -   元组的顺序不重要
+
+        -   属性的顺序不重要
+
+    -   关系模型的优点
+
+        -   容易理解
+
+        -   模型和SQL语言的同步发展
+
+        -   基于集合
+
+-   数据约束
+
+    -   实体完整性约束 -------- 元组的主键不能为零
+
+    -   参照完整性约束
+
+        -   关系与关系的连接通过公共属性实现。一个表的主键，一个表的外键。
+
+        -   外键必须是必须是另一个表的主键的有效值或者为空
+
+        -   外键是否为空，视具体问题，若外键也具有主键的作用，不能为空，否则允许为空
+
+        -   外键指向另一个表的主键
+
+    -   用户自定义完整性约束 -------- 用户自己定义的数据范围，使用check进行约束
+
+-   键
+
+    -   超键 -> 关系属性的子集，唯一确定用户$R(name, country, number)$
+
+    -   备选键：最小的超键
+
+    -   主键：有多条备选键，任何一个都能当作主键
+
+-   数据库的操作 -> 可能的约束破坏
+
+    -   插入
+
+        -   域：新元组的数据并不在域内
+        -   键：新插入的键已经存在 -> 主键唯一定义
+        -   外键约束：新插入的外键在引用的表的主键中不存在
+        -   完整性约束：新插入的元组的主键为空
+
+    -   删除
+
+        -   可能破坏参考完整性约束
+
+        -   如果被删除的主键被别的表所引用
+
+        -   数据库提供的不同的策略以应对这样的删除操作
+
+    -   更新
+
+        -   域和NOT NULL非空约束可能会被破坏
+
+        -   更新主键：可能导致重复的主键
+
+        -   更新外键：可能导致外键的约束被破坏
+
+        -   可能导致数据不在属性的域内
+
+-   SQL语句
+
+    -   解释型语言，只要告诉他做什么
+
+    -   DDL DQL DML
+
+## 创建
+
+### 创建数据库/使用新建的数据库
+
+```{sql, connection=con}
+create database company;
+use company;
+```
+
+### 创建表格
+
+```{sql, connection=con}
+create table Student(
+  Sno char(6) primary key,
+  Sname varchar(8) not null,
+  Ssex char(2) not null,
+  Sage smallint,
+  Sdept varchar(15)
+);
+```
+
+```{sql, connection=con}
+create table Course(
+  Cno char(4) primary key,
+  Cname varchar(20) not null,
+  Cpno char(4),
+  Ccredit smallint
+);
+    ```
+
+#### 创建表格的时候添加多个主键
+
+```{sql, connection=con}
+create table SC(
+Sno char(4),
+Cno char(6) not null,
+Grade decimal(12,2) not null,
+PRIMARY KEY (Sno, Cno)
+);
+    ```
+    
+#### 创建表格的时候添加外键
+    
+```{sql, connection = con}
+create table SC(
+Sno char(4) foreign key references Student(Sno),
+Cno char(6),
+Grade decimal(12,1),
+CONSTRAINT pk_sc PRIMARY KEY  (Sno, Cno)
+CONSTRAINT fkName foreign key (students.courseID) references courses (courseID)
+);
+```
+    
+### 修改表格/删除整张表
+
+####加入列
+
+```{sql, connection = con}
+alter table Student add column address varchar(60);
+```
+
+```{sql, connection=con}
+alter table Student add inDate date;
+```
+
+#### 更改列的属性
+
+```{sql, connection = con}
+ALTER TABLE student ALTER COLUMN address type varchar(50)
+```
+
+#### 删除列
+
+```{sql, connection=con}
+alter table Student drop indate;
+```
+
+#### 解除主键限制
+
+```{sql, connection=con}
+alter table student drop constraint student_pkey
+```
+
+#### 删除外码
+    
+```{sql, connection = con}        
+alter table sc drop constraint sc_cno_fkey;
+```    
+
+#### 添加主码
+
+```{sql, connection = con}
+alter table sc add constraint pk_sc primary key (sno, cno);
+```
+
+#### 添加外码
+
+```{sql, connection = con}    
+alter table sc add constraint sc_cno_fkey foreign key (cno) references course (cno);
+```
+
+#### 添加默认数值
+```{sql, connectionn = con}
+alter table sc set default "123";
+```
+
+#### 删除整张表
+  
+```{sql, connection=con}
+drop table if exists SC;
+```
+
+#### 添加备选键
+    
+```{sql, connectionn = con}
+StudentID INT UNIQUE,
+CONSTRAINT UC_Person UNIQUE (ID,LastName)
+```
+
+#### 表格重命名
+```{sql, connection = con}
+
+
+```
+
+#### delete语句
+- delete from <tableName>
+  where <expression>;
+  
+- delete from students; 没有where语句默认所有的数据均符合条件，所有数据均被删除，但schema存在
+
+- 复杂的删除语句：给定选课表studentOptions(classID, studentID, className)表信息，删除选课人数>2的课程
+    
+```{sql, connection = db}
+delete from studentOption s
+where exists
+(select studentID
+from studentOptions
+where classID = s.classID
+and studentID <> s.studentID);
+```    
+注释：
+首先获取当前数据之外和当前数据选择同一门课程的学生名单
+如果存在和我选择同一门课程的其它学生，则删除当前数据这条选课记录
+
+### 设定约束
+
+- 设定不能为空/默认值/范围
+- 设定不能为空/默认值 删除的时候用drop
+
+```{sql, connection=con}
+ALTER TABLE student alter column sdept set default 'JSJ';
+```
+
+```{sql, connection=con}
+ALTER TABLE student ALTER COLUMN sdept set not null;
+```
+
+```{sql, connection=con}
+ALTER TABLE student ADD CONSTRAINT age_check CHECK (sage > 16);
+```
+
+```{sql, connection=con}
+ALTER TABLE student ADD CONSTRAINT sex_check CHECK (ssex IN ('男', '女'));
+```
+
+### 数据输入
+
+    INSERT INTO TABLE(COL1, COL2 ...) VALUES (...)
+
+```{sql, connection = con}
+INSERT INTO STUDENT
+  VALUES (5001, '赵强', '男', 20, 'SX');
+```
+
+#### 插入指定的行
+
+```{sql, connection = con}
+INSERT INTO COURSE (cno, cname, Ccredit)
+  VALUES (1801, 'C语言', 4);
+```
+
+#### 修改记录
+
+```{sql, connection = con}
+UPDATE STUDENT
+SET SAGE = SAGE + 2
+WHERE SNO = '5001';
+```
+
+#### 删除记录
+
+```{sql, connection = con}
+DELETE FROM SC
+WHERE CNO = '1802';
+```
+
+#### 展示表格
+
+```{sql, connection = con}
+SELECT * FROM STUDENT;
+```
+
+#### 从别的表格中插入表格
+
+```{sql, connect = con}
+INSERT INTO COURSE (cno, cname, Ccredit)
+SELECT sname, ssex, sage
+FROM student
+WHERE # condition;
+```
+
+## Select 语句
+    
+### Select语句的语法：
+
+```{sql}
+select [distinct] 目标列名
+from 基本表名
+where 行条件表达式
+group by 列名1序列 [having 组条件表达式]
+order by 列名 [asc/desc] 序列
+```
+    
+- 读取from字句中基本表、视图数据，执行笛卡尔积的操作
+- 选取满足where子句中给出的条件表达式的元组
+- 按group字句中指定列的值分组，同时提取满足having字句中组条件表达式的那些组
+- 按select子句中给出的列名或列表达式求值输出
+- order子句对输出的目标进行排序，asc表示升序排序，desc表示降序排序
+    
+- where子句称为"行条件子句"
+- group子句称为"分组子句"
+- having子句称为"组条件子句"
+- order子句称为"排序子句"
+    
+- where子句的条件表达式使用的运算符：
+算数：<, >, <=, >=, =, <>, !=
+逻辑表达式：and, or, not
+集合成员资格运算符：in, not in
+谓词：exists, all, some, unique
+聚合函数：avg, min, max, sum, count
+集合运算符：union, intersect, except
+    
+- distinct：使用distinct关键字去除重复数据
+    
+- 点限定+别名：select S.student from student S;
+    
+- like操作符：用于判断字符串是否满足一定的格式要求
+  % -> 百分号用于模糊匹配0个或者多个字符串
+  _ -> 下划线用于模糊匹配单个字符串
+      
+```{sql}
+SELECT
+’foo’ LIKE ’foo’, – true
+’foo’ LIKE ’f%’, – true
+’foo’ LIKE ’_o_’, – true
+’bar’ LIKE ’b_’; – false
+```
+- 可以使用AS <newname>语句对查询的属性或者表达式建立别名
+通常情况下，会省略AS关键词，语句仍然是可以正确识别
+    
+- 当数据允许不存在时，在数据库中以NULL的形式存储
+NULL不是实数，不能和数据或表达式的值进行比较
+NULL适用于：1、不知道的数据2、不可获取的数据3、不适用的数据
+不同的NULL不可以比较
+考虑到NULL值，条件表达式是一个三值逻辑：TRUE, FALSE, UNKNOWN
+任何数值与NULL对比，结果均为UNKNOWN
+判定NULL的方法：A IS NULL / A IS NOT NULL
+    
+#### 检索所有列的所有行：
+
+```{sql, connection = con}
+SELECT * FROM SC;
+```
+
+#### 检索指定列的所有行：
+
+```{sql, connection = con}
+SELECT Sno, Cno FROM SC;
+```
+
+#### 检索满足特定条件的行：
+
+```{sql, connection = con}
+SELECT * FROM SC WHERE Sno = '3001';
+```
+
+#### 按特定列对结果进行分组：
+
+```{sql, connection = con}
+SELECT sno, sname, COUNT(*) FROM student GROUP BY sno;
+```
+
+#### 按特定列对结果进行排序：
+
+##### 升序
+
+```{sql, connection = con}
+SELECT * FROM student ORDER BY sno ASC;
+```
+
+##### 降序
+
+```{sql, connection = con}
+SELECT * FROM student ORDER BY sno DESC;
+```
+
+
+### 简单的多表查询
+From语句中可以选择多张表格，若属性名称相同，使用点限定符号进行区分
+多表连接，使用笛卡尔积
+选择相同的表多次需要起别名
+    
+```{sql, connection = db}
+select d1.name, d2.name
+from drinks d1, drinks d2 /*对两张相同名称的表格起别名*/
+where d1.manf = d2.manf
+and d1.name < d2.name; /*保证不重复且按字符串排序*/
+```
+    
+### 嵌套查询/子查询
+    
+被括号包围的select语句可以作为select语句的子查询语句
+例：获取被至少一名经常光顾金鸡湖大润发超市的顾客喜欢的饮料清单
+    
+```{sql, connection = db}
+select itemname as item /*用as改变输出的表头*/
+from drinks
+    (select customerid
+          from frequents
+          where shopname = '大润发') F
+where Likes.customerid = F.customerid;
+    ```
+    
+#### 标量子查询，保证查找数据为单行
+    
+```{sql, connection = db}
+select shop
+from sells
+where item = '华润怡宝' and
+      price = 
+      (select price
+       from sells
+       where shop = '大润发超市'
+       and item = '农夫山泉');
+```
+    
+#### IN语句
+给定饮料表drinks(names,manf)和用户喜好表Likes(personName, drinkName),获取小明喜好的饮料名称和制造商
+    
+```{sql, connection = db}
+select name, manf
+from Drinks
+where name in
+  (select drinkName
+    from likes
+    where personName = '小明');
+```
+    
+#### 关联子查询
+EXIST语句
+饮料表Drinks(name,manf),寻找供应商唯一产品的饮料
+        
+```{sql}
+select name
+from Drinks d1
+where not exists(
+select *
+from drinks
+where manf = d1.manf and
+name <> d1.name
+)
+```
+
+子查询和多表查询的不同之处：多表查询是使用笛卡尔积计算
+    
+### 集合比较
+    
+#### Any：只需一个数据满足为真
+- select 1 = any (select * from testT)
+  当testT中含有1时，返回true
+  当testT中不含有1时，返回false
+
+- x > any(<relation>) 意味着只要x不是最小的那个数，就返回真
+
+#### All：全部的数据都满足
+
+#### 集合的补集(取反)：
+  = any -> <> all
+  = all -> <> any
+    
+返回全部的courseID，并且保证学生Bob不在此课程中，或者不是唯一的学生
+
+#### 一些例子        
+集合的补集
+        
+```{sql, connection = db}
+select distinct courseid
+from studentcourse
+where (studentID <> all(
+select studentID from students
+where studentName = 'Bob'));
+```
+        
+使用集合的差集 Minus #?那bob和其他同学同时选出来的可不也被删除了吗
+        
+```{sql, connection = db}
+(select distinct courseID from studentCourse)
+minus
+(select distinct courseID
+from students, studentCourses
+where students.studentID = studentCourse.studentID
+and students.studentName = 'Bob');
+```
+
+在销售表Sells(shop, drink, price)中寻找最贵的饮料 all操作
+    
+```{sql, connection = db}
+select drink
+from sells
+where price >= all(
+      select price
+      from sells);
+```
+
+### 使用子查询插入数据
+example(source1, source2) backup(copy1, copy2)
+```{sql}
+INSERT INTO backup (copy1, copy2)
+SELECT E.source1, E.source2
+FROM example E
+WHERE source1 > 2;
+```
+
+
+### 集合的常见操作：交/并/差
+- 交集 intersect
+- 并集 union
+- 差集 except
+
+like(people, drink)   sells(shop, drink, price)   frequents(people, shop)
+```{sql}
+(select * from likes)
+intersect
+(select drink, people
+ from sells, frequents
+ where
+ frequents.shop = sells.shop
+)
+```
+
+## 数据库的容器
+
+### Set
+不允许存在重复
+```{sql}
+select DISTINCT ...
+```
+
+### Bag
+允许存在重复
+针对Likes(people, drink)和frequents(people, shop)选取不爱喝饮料却经常购买饮料的
+```{sql}
+select people from 
+except all /*集合操作，只显示一条记录*/
+(select people from likes)
+```
+
+## 自然连接
+
+### 笛卡尔积 (不是自然连接)
+```{sql}
+R CROSS JOIN S;
+```
+
+### 自然连接
+```{sql}
+R NATURE JOIN S;
+```
+- 对关系R与S执行笛卡尔积操作
+- 在R与S中寻找列名和列数据类型相同的属性列
+- 仅保留相同属性中数值相同的数据
+- 这些相同的属性仅保留一份
+
+### Join on
+```{sql}
+Customer JOIN Frequent
+ON name = customerName;
+```
+- 若条件是"=", 这样的连接称为equi-join
+- 若连接条件包含非"=", 这样的连接称为theta-join
+
+
+### Inner join
+内连接的查询结果与表的顺序无关 -> 查询结果的顺序可能改变但是结果集相同
+```{sql}
+select *
+from students S inner join studentCourse C
+on S.studentID = C.studentID;
+```
+
+
+### Outer join
+- 内连接会丢失一部分信息
+
+LEFT/RIGHT/FULL OUTER JOIN
+- left:保留左表的全部数据，右表无配对时用NULL替代
+- right:保留右表的全部数据，左表无配对时用NULL替代
+```{sql}
+select *
+from students S LEFT OUTER JOIN studentCourses C
+ON S.studentID < C.studentID
+```
+
+自然连接可以是外连接也可以是内连接
+
+### Using语句
+类似于on，指定连接的属性名，简化写法
+```{sql}
+select *
+from students S inner join studentCourse C
+using studentID; /*on S.studentID = C.studentID*/
+```
+
+## Index
+创建一个Index可以加速查询的过程
+\timing 表示打开计时功能
+
+创建Index
+```{sql, connect = con}
+create index ix_student_sname on student(sname);
+```
+
+删除Index
+```{sql, connect = con}
+drop index ix_student_sname;
+```
+
+插入大量数据进入student表
+```{sql, connection = con}
+CREATE PROCEDURE insert_to_student()
+LANGUAGE plpgsql AS
+$$
+DECLARE
+    nCnt int :=12000;
+    sNo varchar(6);
+    sname varchar(8);
+begin
+    while nCnt<999999 loop
+
+        nCnt := nCnt + 1;
+        sNo := nCnt::varchar(6);
+        sName := CONCAT('张',sno);
+        insert into student (sno,sname,ssex,sage) values ( sno,sname,'男',20);
+    end loop;
+end
+$$;
+```
+
+```{sql, connection = con}   
+select * from student;
+```    
+    
+    
+## 聚合函数    
+sum, avg, count, min, max, percentile
+一律忽略NULL，看成是零
+
+查询不同的售价 -> count和distinct的叠加
+```{sql, connection = con}
+select count(distinct price)
+from sells
+where itemtype = '饮料'
+```
+
+查询结果的差异
+- count(*) 包含所有的列
+- count(1) 忽略所有列，用1表示每一行
+- count(列名) 将返回的表格除去null后所有行的总数
+
+查询效率的差异
+- 列名为主键，count(列名)会比count(1)快
+- 有主键，count(主键)的执行效率是最优的
+- 如果只有一个字段，count(*)是最优的
+
+### 分组聚合
+group by
+```{sql, connection = con}
+select courseID, count(*) as students
+from studentCourses
+group by courseID;
+```
+- group by的后面的属性名一定也要出现在select的后面
+- select后面要么是聚合函数，要么是分组的变量
+- NULL会被作为一个单独的分组进行聚合
+
+## having子句
+- where子句对元组/行进行过滤
+- 聚合函数不能够在WHERE子句中进行比较
+- 对组级别的进行筛选过滤
+- having语句需要放在group by的后面
+
+```{sql}
+select itemname, AVG(price)
+from sells
+group by itemName
+having count(shop) >= 3
+  or itemname in(
+  select name
+  from items
+  where manf = "农夫山泉"
+);
+```
+
+## 断言Assertions
+- 对数据库状态的约束，而不是简单的针对属性或者某个元组的约束
+
+保证学生的选课数量不能过高
+```{sql}
+create assertion courseload
+check(not exists(
+  select *
+  from studentCourses
+));
+```
+
+## 备份与还原
+- 对于postgre不存在像甲骨文的垃圾回收站机制
+### 备份
+备份单张表格
+```{sql, connection = con}
+pg_dump -d school -t sc > mydb-table_1.sql;
+```
+备份全部表格
+```{sql, connection = con}
+pg_dumpall > alldbs.sql
+```
+### 还原
+```{sql, connection = con}
+psql mydb < mydb-table_1.sql;
+```
+
+## 视图
+- 视图是从别的表格/视图上衍生出来的表
+
+
+
+
+
