@@ -1,4 +1,10 @@
 #!/usr/bin/python
+# schema方案和选择的原因：
+#
+#
+#
+#
+
 import psycopg2 as p
 import getpass
 
@@ -6,35 +12,37 @@ import getpass
 def menu():
     print()
     print("-"*30)
-    print("[1] Add new client")
-    print("[2] Client update")
-    print("[3] Delete client")
-    print('[4] Go back to main page')
-    print("[0] Exit the program.")
+    print("[1] 每个班级的学生数量")
+    print("[2] 学生的平均分")
+    print("[3] 学生的选课清单")
+    print('[4] 课程模块的管理者')
+    print("[5] 年度最佳管理者及学生")
+    print("[0] 退出")
     print("-"*30)
 
+# 定义查询每个班级的学生数量的函数
+def stu_count(conn):
+    cur = conn.cursor()
+    cur.execute("select count(class_name) from student group by class_name;")
+    data_classname = cur.fetchone()
+    print(data_classname)
+    cur.close()
 
-def products(conn):
-    # Adăugarea/ Ștergerea/ Actualizarea unui nou produs
-    print("products")
-
-
-def clients(conn):
-    # Adăugarea/ Ștergerea/ Actualizarea unui nou client
+# 定义查询学生平均分的函数
+def avg_grade(conn):
     print("clients")
 
-
-def display(conn):
-    # Afișarea listei de produse/ clienți
-    # Afișarea unui client/ produs specific
+# 定义查询学生选课清单的函数
+def list_ch(conn):
     print("display")
 
-
-def reports(conn):
-    # Media de varsta a clientilor
-    # Prețul mediu al produselor
+# 定义查询课程模块管理者的函数
+def admin(conn):
     print("reports")
 
+# 定义查询年度最佳管理者和学生的函数
+def best_admin_stu(conn):
+    print("reports")
 
 def run():
     conn = None
@@ -53,17 +61,18 @@ def run():
 
         while option != 0:
             if option == 1:
-                products(conn)
+                stu_count(conn)
 
             elif option == 2:
-                clients(conn)
+                avg_grade(conn)
 
             elif option == 3:
-                display(conn)
+                list_ch(conn)
 
             elif option == 4:
-                reports(conn)
-
+                admin(conn)
+            elif option == 5:
+                best_admin_stu(conn)    
             else:
                 print("Invalid option.")
 
